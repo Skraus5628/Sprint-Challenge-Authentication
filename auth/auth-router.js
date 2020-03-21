@@ -1,54 +1,43 @@
 const router = require('express').Router();
-const bc = require('bcryptjs')
-const jwt = require('jsonwebtoken')
-const Users = require('../model')
 
+const bcrypt = require('bcryptjs');
+
+const Users = require('../users/users-model');
 
 router.post('/register', (req, res) => {
+  // implement registration
   let user = req.body;
-  const hash = bc.hashSync(user.password, 8);
+
+  const hash = bcrypt.hashSync(user.password, 8);
   user.password = hash;
 
   Users.add(user)
-    .then(newUser =>{
-      res.status(201).json(newUser)
-    })
-    .catch(error =>{
-      res.status(500).json(error);
-    })
+  .then(saved => {
+    res.status(201).json(saved);
+  })
+  .catch(error => {
+    res.status(500).json(error);
+  });
 
 });
 
-router.post('/login', (req, res) => {
-    let { username, password } = req.body;
+router.post('/login', async (req, res) => {
+  const { username, password } = req.body;
 
-    Users.findBy({ username })
+  Users.findBy({ username })
       .first()
-      .then(user =>{
-        if (user && bc.compareSync(password, user.password)) {
-
-          const token = signToken(user)
-
-          res.status(200).json({ token });
-        } else {
-          res.status(401).json({ message: 'Invalid Credentials' });
-        }
+      .then(log => {
+          if (log && bcrypt.compareSync(password, log.password)) {
+            req.session.loggedin = true;
+              res.status(200).json({ message: `Welcome ${log.username}!` });
+          } else {
+              res.status(401).json({ message: 'invalid credentials' });
+          }
       })
-      .catch(error =>{
-        res.status(500).json(error);
-      })
+      .catch (err => {
+      res.status(500).json({ message: 'errors were made', err });
+  });
+
 });
 
-function signToken(user){
-  const payload ={
-    username: user.username
-  };
-
-  const options = {
-    expiresIn: 60*60*24
-  };
-
-  return jwt.sign(payload, process.env.JWT_SECRET, options)
-}
-
-module.exports = router;
+module.exports = router; 
